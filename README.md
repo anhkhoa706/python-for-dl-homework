@@ -54,6 +54,6 @@ All content in this repository is provided under the [MIT License](LICENSE). Fee
 ---
 
 ## ✍️ Maintained by
-Your Name (you@example.com)
+Anh Khoa Nguyen (anhkhoadeptrai706@gmail.com)
 
 Happy coding! 🧠💻
