@@ -1,0 +1,7 @@
+matplotlib
+scikit-learn
+seaborn
+requests
+tensorboard
+torch
+torchvision

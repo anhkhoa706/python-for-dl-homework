@@ -1,8 +1,9 @@
 data
 runs
 
-# Notebook Checkpoints
+# Jupyter Notebook checkpoints and metadata
 .ipynb_checkpoints/
+*.ipynb
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
