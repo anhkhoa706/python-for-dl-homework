@@ -1,4 +1,4 @@
-# Homework: Improve CNN Model with TensorBoard (EMNIST, MNIST, FashionMNIST, KMNIST)
+# Improve CNN Model with TensorBoard (EMNIST, MNIST, FashionMNIST, KMNIST)
 
 This repository contains multiple neural network models to classify handwritten digits and characters using PyTorch and visualize performance using TensorBoard.
 
