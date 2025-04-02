@@ -39,8 +39,8 @@ All datasets are loaded via `torchvision.datasets`:
 
 Understand how a Convolutional Neural Network works visually:
 
-📺 [Watch: How CNNs work (YouTube)](https://www.youtube.com/watch?v=eMXuk97NeSI)
-🧠 [Design CNN](./CNN_Design_Strategy.md)
+- 📺 [Watch: How CNNs work (YouTube)](https://www.youtube.com/watch?v=eMXuk97NeSI)
+- 🧠 [Design CNN](./CNN_Design_Strategy.md)
 
 ## 🧰 How to Use
 
