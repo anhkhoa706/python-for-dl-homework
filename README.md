@@ -1,4 +1,4 @@
-# 🧠 Python for Deep Learning - Homework Repository
+# Python for Deep Learning - Homework Repository
 
 Welcome to the **Python for DL (Deep Learning)** course homework repository! This repo is organized week-by-week to showcase projects and hands-on exercises built throughout the course.
 
