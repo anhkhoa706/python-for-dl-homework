@@ -6,30 +6,35 @@ Welcome to the **Python for DL (Deep Learning)** course homework repository! Thi
 
 ## 📅 Weekly Homework Overview
 
-### 📦 Week 01–02: Maze Game
+### Week 01–02: Maze Game
 A Python-based interactive **Maze Game** built with Tkinter.
 - Procedural maze generation
 - Manual or auto-solve navigation
 - UI with arrow-key support
-👉 See: `week01-02/README.md`
+- 👉 See: `week01-02/README.md`
 
 ---
 
-### 📈 Week 03: Real Estate Price Prediction
+### Week 03: Real Estate Price Prediction
 A linear regression model built with **PyTorch** to predict housing prices using features such as property age, area, and distance to the city center.
 - Trained with Stochastic Gradient Descent
 - Includes training curve and MAPE evaluation
-👉 See: `week03/README.md`
+- 👉 See: `week03/README.md`
 
 ---
 
-### 🧠 Week 04: Perceptron Implementation
+### Week 04: Perceptron Implementation
 Implementation of a **simple Perceptron** using:
 - ✅ `scikit-learn` for quick baseline
 - 🔧 `PyTorch` for custom hands-on model
 - Comparison of normalization, loss curves, and confusion matrices
-👉 See: `week04/README.md`
+- 👉 See: `week04/README.md`
 
+### Week 06: CNN Improvements Across Datasets
+Enhanced a **convolutional neural network** and applied it to MNIST, FashionMNIST, KMNIST, and EMNIST.
+- ✅ Upgraded architecture with multiple conv layers, batch norm, and dropout
+- 📊 Visualized training/validation metrics and misclassifications using TensorBoard
+- 👉 See: `week06/README.md`
 ---
 
 ## 🧰 How to Use
@@ -51,9 +56,3 @@ python price_prediction.py
 ## 🔖 License
 All content in this repository is provided under the [MIT License](LICENSE). Feel free to learn from and build upon this work!
 
----
-
-## ✍️ Maintained by
-Anh Khoa Nguyen (anhkhoadeptrai706@gmail.com)
-
-Happy coding! 🧠💻
