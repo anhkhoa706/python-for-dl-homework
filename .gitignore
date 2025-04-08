@@ -1,5 +1,7 @@
 data
 runs
+*checkpoints
+*.pyc
 
 # Jupyter Notebook checkpoints and metadata
 .ipynb_checkpoints/
