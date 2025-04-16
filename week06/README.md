@@ -46,7 +46,7 @@ Understand how a Convolutional Neural Network works visually:
 
 1. Install dependencies:
  ```bash
- pip install torch torchvision tensorboard matplotlib
+ pip install -r requirements.txt
  ```
 2. Run any .ipynb notebook in Jupyter or VSCode
 3. Launch TensorBoard to track metrics:
