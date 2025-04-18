@@ -3,6 +3,7 @@ runs
 *checkpoints
 *.pyc
 *.zip
+*data_dog_breeds
 
 # Jupyter Notebook checkpoints and metadata
 .ipynb_checkpoints/
