@@ -1,43 +1,57 @@
 # Python for Deep Learning - Homework Repository
 
-Welcome to the **Python for DL (Deep Learning)** course homework repository! This repo is organized week-by-week to showcase projects and hands-on exercises built throughout the course.
+Welcome to the **Python for Deep Learning (DL)** course homework repository!  
+This repository is organized week-by-week to showcase projects and hands-on exercises developed throughout the course.
 
 ---
 
 ## 📅 Weekly Homework Overview
 
-### Week 01–02: Maze Game
-A Python-based interactive **Maze Game** built with Tkinter.
-- Procedural maze generation
-- Manual or auto-solve navigation
-- UI with arrow-key support
-- 👉 See: `week01-02/README.md`
+### 📘 Week 01–02: Maze Game  
+A Python-based interactive **Maze Game** built with Tkinter.  
+- Procedural maze generation  
+- Manual or auto-solve navigation  
+- GUI with arrow-key support  
+- 📄 See: `week01-02/README.md`
 
 ---
 
-### Week 03: Real Estate Price Prediction
-A linear regression model built with **PyTorch** to predict housing prices using features such as property age, area, and distance to the city center.
-- Trained with Stochastic Gradient Descent
-- Includes training curve and MAPE evaluation
-- 👉 See: `week03/README.md`
+### 🏠 Week 03: Real Estate Price Prediction  
+A linear regression model using **PyTorch** to predict housing prices based on features such as property age, area, and distance to the city center.  
+- Trained using stochastic gradient descent  
+- Includes training curve and MAPE evaluation  
+- 📄 See: `week03/README.md`
 
 ---
 
-### Week 04: Perceptron Implementation
-Implementation of a **simple Perceptron** using:
-- ✅ `scikit-learn` for quick baseline
-- 🔧 `PyTorch` for custom hands-on model
-- Comparison of normalization, loss curves, and confusion matrices
-- 👉 See: `week04/README.md`
+### 🧠 Week 04: Perceptron Implementation  
+Implementation of a **simple perceptron** using:  
+- `scikit-learn` for baseline experimentation  
+- `PyTorch` for custom hands-on model  
+- Comparison of normalization, loss curves, and confusion matrices  
+- 📄 See: `week04/README.md`
 
-### Week 06: CNN Improvements Across Datasets
-Enhanced a **convolutional neural network** and applied it to MNIST, FashionMNIST, KMNIST, and EMNIST.
-- ✅ Upgraded architecture with multiple conv layers, batch norm, and dropout
-- 📊 Visualized training/validation metrics and misclassifications using TensorBoard
-- 👉 See: `week06/README.md`
 ---
 
-## 🧰 How to Use
+### 🌀 Week 06: CNN Improvements Across Datasets  
+Enhanced a **convolutional neural network (CNN)** and applied it to MNIST, FashionMNIST, and EMNIST datasets.  
+- Improved architecture with multiple convolutional layers, batch normalization, and dropout  
+- Training/validation metrics and misclassified samples visualized using TensorBoard  
+- 📄 See: `week06/README.md`
+
+---
+
+### ⚡ Week 08: Lightweight CNN Model  
+Developed a **lightweight CNN architecture** and applied it to MNIST, FashionMNIST, KMNIST, and EMNIST.  
+- Utilized depthwise separable convolutions and Squeeze-and-Excitation blocks  
+- Incorporated data augmentation, learning rate scheduling, and early stopping  
+- Configured `num_workers` for efficient data loading during GPU training  
+- Visualized model performance and misclassifications via TensorBoard  
+- 📄 See: `week08/README.md`
+
+---
+
+## 🚀 How to Use
 
 1. Clone the repository:
 ```bash
@@ -53,6 +67,6 @@ python price_prediction.py
 
 ---
 
-## 🔖 License
-All content in this repository is provided under the [MIT License](LICENSE). Feel free to learn from and build upon this work!
-
+## 📜 License  
+All content in this repository is licensed under the [MIT License](LICENSE).  
+You are welcome to explore, learn from, and build upon this work.
