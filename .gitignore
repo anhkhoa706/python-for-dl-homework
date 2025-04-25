@@ -5,6 +5,7 @@ runs
 *.zip
 *data_dog_breeds
 *report
+*dataset
 
 # Jupyter Notebook checkpoints and metadata
 .ipynb_checkpoints/
