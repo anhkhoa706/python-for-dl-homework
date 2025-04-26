@@ -51,6 +51,24 @@ Developed a **lightweight CNN architecture** and applied it to MNIST, FashionMNI
 
 ---
 
+### 🐶 Week 09: Dog Breed Classification
+Applied transfer learning to classify 12 dog breeds using GoogLeNet, ResNet-18, EfficientNet-B0, and Swin Transformer.  
+- Dataset collected via Bing Search  
+- Aggressive data augmentation and dropout regularization  
+- TensorBoard logging and confusion matrices for evaluation  
+- 📄 See: `week09/README.md`
+
+---
+
+### 📊 Week 10: Crowd Counting
+Built a crowd counting regression model using a fine-tuned pre-trained CNN.  
+- Dataset: Aerial crowd images from ShanghaiTechDataset  
+- Fine-tuned with Smooth L1 Loss (Huber Loss) and evaluated with custom Model Score  
+- Emphasis on balancing accuracy, model size, and efficiency  
+- 📄 See: `week10/README.md`
+
+---
+
 ## 🚀 How to Use
 
 1. Clone the repository:

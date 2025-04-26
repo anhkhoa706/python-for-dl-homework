@@ -1,101 +1,86 @@
+# 🐶 Dog Breed Classification via Transfer Learning
 
-# 🐶 Dog Breed Classification using EfficientNet & Vision Transformer
-
-This project uses **transfer learning** with **EfficientNet** and **Vision Transformer (ViT)** to classify 8 dog breeds, based on data crawled from Bing.
+This project classifies **12 dog breeds** using **transfer learning** with four deep learning models: GoogLeNet, ResNet-18, EfficientNet-B0, and Swin Transformer.
 
 ---
 
-## 📚 Dog Breed Labels (Based on AKC)
+## 📚 Dog Breeds
 
-We used the [AKC Dog Breeds](https://www.akc.org/dog-breeds/) to define our breed list:
-- Bichon Frise
-- Bulldog
-- Chihuahua
-- Collie
-- German Shepherd Dog
-- Siberian Husky
-- Pug
-- Beagle
+Collected via Bing Search:
 
-Each class has 150 images stored in:
+- Beagle, Bichon Frise, Bulldog, Chihuahua, Collie
+- German Shepherd, Pug, Siberian Husky, Dalmatian
+- Shiba Inu, Yorkshire Terrier, Labrador Retriever
+
+Each breed has ~110-125 images under:
 ```
 data_dog_breeds/{Breed_Name}/image.jpg
 ```
 
 ---
 
-## 🛠️ Project Features
+## 🛠️ Features
 
-- ✅ EfficientNet-B0 and ViT-B16 with pretrained ImageNet weights
-- ✅ Custom dataset using `torchvision.datasets.ImageFolder`
-- ✅ Train/Validation split
-- ✅ TensorBoard logging (`runs/`)
-- ✅ Val accuracy, confusion matrix, and prediction visualization
-- ✅ Final model checkpoints saved to `checkpoints/`
+- Custom dataset cleaned & validated
+- Strong data augmentation
+- Transfer learning with 4 pretrained models
+- Dropout regularization before classifier head
+- TensorBoard logging, confusion matrices, learning curves
+- Checkpoints saved after training
 
 ---
 
-## 🚀 How to Run
+## 🚀 Quick Start
 
-### 1. Install Dependencies
+1. Install dependencies:
 ```bash
 pip install torch torchvision matplotlib scikit-learn tensorboard
 ```
 
-### 2. Prepare Dataset
-Make sure your folder looks like this:
+2. Folder Structure:
 ```
-data_dog_breeds/
-├── Beagle/
-├── Bichon_Frise/
-├── Bulldog/
-├── Chihuahua/
-├── Collie/
-├── German_Shepherd_Dog/
-├── Pug/
-└── Siberian_Husky/
+data_dog_breeds/{Breed}/
 ```
 
-> You can crawl images with `icrawler`. Ask if you need a script for that.
-
----
-
-### 3. Train Models & Visualize Training with TensorBoard
+3. Train & Evaluate:
 ```bash
-tranferlearning.ipynb
+transferlearning.ipynb
 ```
-- Logs: `runs/efficientnet/`, `runs/vit/`
-- Models: `checkpoints/efficientnet_model.pt`, `checkpoints/vit_model.pt`
-- Outputs:  
-  - `efficientnet_confusion_matrix.png`  
-  - `efficientnet_Sample_Predictions.png`  
----
 
-## 📈 Example Output
-
-- Confusion matrix (8 classes)
-- Predicted vs. ground truth visualization (first 8 validation images)
-- TensorBoard logs for accuracy/loss
+TensorBoard:
+```bash
+tensorboard --logdir=runs
+```
 
 ---
 
-## 📂 File Structure
+## 📊 Model Summary
+
+| Model              | Params (M) | Best Val Accuracy |
+|:-------------------|:----------:|:-----------------:|
+| EfficientNet-B0    | 4.02M       | ~96.1%            |
+| GoogLeNet          | 5.61M       | ~95.8%            |
+| ResNet-18          | 11.18M      | ~96.8%            |
+| Swin Transformer   | 27.53M      | ~99.3%            |
+
+---
+
+## 📂 Files
 
 ```
 .
-├── tranferlearning.ipynb   #Training script with TensorBoard and visualization              
-├── data_dog_breeds/        # Dog image folders (one per breed)
-├── checkpoints/            # Trained .pt models
-├── runs/                   # TensorBoard logs
-└── README.md               # You are here
+├── transferlearning.ipynb   # Training notebook
+├── data_dog_breeds/         # Dataset
+├── checkpoints/             # Saved models
+├── runs/                    # TensorBoard logs
+└── README.md
 ```
 
 ---
 
 ## 📌 Credits
 
-- AKC Dog Breeds: https://www.akc.org/dog-breeds/
-- Models from `torchvision.models`
-- Data crawled with `icrawler` (optional)
+- Dataset inspired by AKC Dog Breeds
+- Pretrained models from torchvision
+- Crawling using icrawler
 
----
