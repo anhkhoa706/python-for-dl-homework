@@ -1,49 +1,66 @@
 # 📊 Crowd Counting
 
-This project builds a simple yet complete **crowd counting system** using deep learning, based on selecting a pre-trained model and predicting the number of people in images.
+This project builds a simple yet complete **crowd counting system** using deep learning, based on fine-tuning lightweight pre-trained models.
 
 ## 🌍 Objective
 
-Achieve **the best result** using the **smallest model** with the **fewest resources**! 
-You will:
-- Select a pre-trained model.
-- Fine-tune it to **predict the number of people**.
-- Minimize your **Model Score** by balancing **accuracy**, **model size**, and **computation cost**.
+Achieve **the best model** balancing **accuracy**, **small model size**, and **efficient computation**.
+
+We:
+- Selected ShuffleNet V2 0.5× backbone for efficiency.
+- Fine-tuned it for **regression-based people counting**.
+- Applied augmentation and CutMix to boost generalization.
 
 ## 🔄 Project Flow
 
 - **Notebook**: `week10_crowd_counting.ipynb`
-- **Main Sections**:
+- **Key Components**:
   - Data Loading and Preprocessing
-  - Model Architecture Definition
-  - Model Fine-tuning for Regression
+  - Model Architecture Definition (ShuffleNet V2 0.5×)
+  - Data Augmentation (ColorJitter, Random Grayscale, CutMix)
   - Training and Loss Monitoring
-  - Model Evaluation and Visualization
+  - Model Evaluation (MAE, Accuracy, Visualization)
+  - Final Model Score Calculation
+
+✅ We selected ShuffleNet V2 0.5× because after using `crawl_weight.py` to crawl the table of torchvision pre-trained models, ShuffleNet achieved **Rank 1** for the best trade-off between model size, GFLOPS, and initial accuracy.
 
 ## 🌐 Model Score Calculation
 
-You must calculate and **show** your model score using:
+The **Model Score** formula:
 
 ```
 Model Score = (1 - accuracy%) × (number of parameters in M) × GFLOPS × (number of training images)
 ```
 
-- **Lower Model Score = Better Ranking** 📈
-- After calculating:
-  - 1st place = 100 points
-  - 2nd place = 95 points
-  - 3rd place = 90 points
-  - and so on...
+We optimized:
+- **Accuracy**: Maximize prediction performance.
+- **Efficiency**: Minimize model parameters and GFLOPS.
 
-✅ Make your model **small**, **accurate**, and **efficient**.
+✅ A balance between **small model**, **good accuracy**, and **low computation**.
 
+---
 
-## 📂 How to Run
+# 🧪 Final Results
+
+| Method | CutMix Alpha | Augmentation | MAE ↓ | Accuracy ↑ |
+|:--|:--|:--|:--|:--|
+| No Augment | - | ❌ | 118.23 | 72.73% |
+| Augment Only | - | ✅ | 117.81 | 72.85% |
+| CutMix 0.8 + Augment | 0.8 | ✅ | 117.64 | 72.89% |
+| CutMix 1.0 + Augment (**Best Run**) | 1.0 | ✅ | **112.11** | **74.16%** |
+| CutMix 1.5 + Augment | 1.5 | ✅ | 115.47 | 73.39% |
+| CutMix 2.0 + Augment | 2.0 | ✅ | 121.29 | 72.05% |
+
+✅ **Best configuration** achieved **MAE 112.11** and **Accuracy 74.16%**.
+
+---
+
+# 📂 How to Run
 
 ### 1. Install Required Libraries
 
 ```bash
-pip install torch torchvision matplotlib
+pip install torch torchvision matplotlib ptflops
 ```
 
 ### 2. Open and Execute the Notebook
@@ -60,34 +77,62 @@ Follow each cell:
 - Train and record the loss.
 - Evaluate and visualize predictions.
 
-## 🎨 Dataset
+Model and TensorBoard logs are automatically saved.
+
+---
+
+# 🎨 Dataset
 
 - **Dataset**: Aerial images of crowds from [ShanghaiTechDataset](https://github.com/desenzhou/ShanghaiTechDataset)
-- Ground-truth labels are loaded using `week10_2_MatParser.ipynb`.
-- Each sample:
-  - **Input**: A crowd image
-  - **Label**: Number of people
-
-## 🏋️ Model Details
-
 - **Input**: Crowd images
-- **Output**: Predicted number of people
-- **Architecture**: Pre-trained CNN fine-tuned for regression
+- **Label**: Ground-truth number of people (loaded via `.mat` files)
+
+Preprocessing includes resizing, normalization, and optional augmentation.
+
+---
+
+# 🏋️‍♂️ Model Details
+
+- **Architecture**: ShuffleNet V2 0.5× (pre-trained on ImageNet)
+- **Modification**: Final fully-connected layer adjusted for single regression output
 - **Loss Function**: Smooth L1 Loss (Huber Loss)
-- **Optimizer**: Adam
+- **Optimizer**: AdamW
+- **Scheduler**: OneCycleLR
+- **Data Augmentation**:
+  - Random Color Jitter
+  - Random Grayscale
+  - Random Rotation
+  - Gaussian Blur
+  - **CutMix Augmentation**
 
-## 🔍 Outputs
+---
 
-- A trained regression model.
-- Prediction visualization (scatter plot or direct comparison).
-- Final **Model Score** (MUST be reported).
+# 🔍 Key Observations
 
-## ✨ Key Strategy Tips
+- CutMix augmentation **significantly improves** counting accuracy.
+- Optimal CutMix Alpha: **1.0**.
+- Data augmentation alone also helps, but less than CutMix.
 
-- Choose a model with **few parameters and low GFLOPS**.
-- Train efficiently without overfitting.
-- Prioritize **accuracy** but balance **efficiency**.
-- Visualize results clearly.
+---
 
-> 🔗 Remember: Smaller + Smarter + More Accurate = Higher Score!
+# ✨ Strategic Tips
 
+> 🔗 Smaller + Smarter + More Accurate = Higher Score!
+
+- Always balance **model size** and **accuracy**.
+- Proper **augmentation** boosts real-world generalization.
+- Fine-tuning with a lightweight backbone like ShuffleNet V2 achieves excellent efficiency.
+
+---
+
+# 📈 TensorBoard Support
+
+You can run TensorBoard for live training tracking:
+
+```bash
+tensorboard --logdir=runs --port=6009
+```
+
+---
+
+✅ Completed with full experiments, ablation studies, and final model optimization!
