@@ -11,3 +11,5 @@
 ===========================================================================================================
 After put the Accuracy with Tolerance +-20%
 - Best Epoch: 115 - Best Validation Tolerance Accuracy: 49.45% Corresponding Validation MAE: 127.01
+Remove the Smooth, now criterion = nn.L1Loss()
+- Best Epoch: 143 - Best Validation Tolerance Accuracy: 52.10% Corresponding Validation MAE: 119.95
