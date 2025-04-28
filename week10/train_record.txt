@@ -1,0 +1,13 @@
+- MAE: 116.27 (73.20% Acc) - lr: 0.001, patience: 40, cutmix: 1, epochs: 250
+- MAE: 117.64 (72.89% Acc) - lr: 0.001, patience: 50, cutmix: 0.8, epochs: 250
+- MAE: 115.47 (73.39% Acc) - lr:0.001, patience: 50, cutmix: 1.5, epochs: 250
+- MAE: 121.29 (72.05% Acc) - lr:0.001, patience: 50, cutmix: 2, epochs: 250
+- MAE: 119.21 (72.53% Acc) at epochs 128 - lr:0.001, patience: 50, cutmix: 1.5, epochs: 300
+- MAE: 117.81 (72.85% Acc) at epochs 82 - lr:0.001, patience: 50, cutmix: False, epochs: 300
+- MAE: 122.59 (71.75% Acc) - lr:0.001, patience: 50, cutmix: 1.5, epochs: 250
+- MAE: 116.66 (73.11% Acc) at epochs 106 - lr:0.001, patience: 50, cutmix: 1, epochs: 250
+- MAE: 118.23 (72.73% Acc) at epochs 100 - lr:0.001, patience: 50, cutmix: False, augment: False epochs: 250
+- MAE: 112.11 (74.16% Acc) at epochs 136 - lr:0.001, patience: 50, cutmix: 1, epochs: 250, augment: True
+===========================================================================================================
+After put the Accuracy with Tolerance +-20%
+- Best Epoch: 115 - Best Validation Tolerance Accuracy: 49.45% Corresponding Validation MAE: 127.01

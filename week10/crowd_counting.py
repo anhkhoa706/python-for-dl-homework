@@ -28,7 +28,6 @@ import torchvision.models as models
 import torchvision.transforms as transforms
 from torchvision.datasets import ImageFolder
 
-
 # %% [markdown]
 # # Dataset Preparation
 
@@ -199,6 +198,7 @@ def count_parameters(model):
 import numpy as np
 import torch
 
+# CutMix augmentation
 def cutmix_data(x, y, alpha=1.0):
     """
     Apply CutMix augmentation on a batch of images and labels.
@@ -263,90 +263,190 @@ def rand_bbox(size, lam):
     return bbx1, bby1, bbx2, bby2
 
 # %%
-def mixup_data(x, y, alpha=0.4):
-    '''Apply MixUp to a batch of images and labels'''
-    if alpha > 0:
-        lam = np.random.beta(alpha, alpha)
-    else:
-        lam = 1
-
-    batch_size = x.size(0)
-    index = torch.randperm(batch_size).to(x.device)
-
-    mixed_x = lam * x + (1 - lam) * x[index, :]
-    y_a, y_b = y, y[index]
-    mixed_y = lam * y_a + (1 - lam) * y_b
-    return mixed_x, mixed_y
-
-# %%
-def calculate_accuracy(mae, avg_gt):
-    '''Calculate pseudo-accuracy based on MAE and average ground truth.'''
-    return max(0, (1 - (mae / avg_gt)) * 100)
-
-# %%
-def calculate_avg_ground_truth(loader):
-    """Calculate average ground truth (count) from a DataLoader.
-
-    Supports both:
-    - Train loader (batch: images, targets)
-    - Test loader (batch: images, targets, raw images)
+# Calculate Mean Absolute Error (MAE) and Tolerance-based Accuracy with Tolerance is ±20%
+def evaluate_model_mae_tolerance(model, loader, device, tolerance=0.2):
     """
-    total = 0.0
-    count = 0
+    Evaluate the model on the given loader and compute:
+      - Mean Absolute Error (MAE)
+      - Tolerance-based accuracy
 
-    for batch in loader:
-        # If batch has 3 elements (img, target, raw_img)
-        if isinstance(batch, (tuple, list)) and len(batch) == 3:
-            _, targets, _ = batch
-        else:
-            _, targets = batch
+    Args:
+        model: Trained PyTorch model
+        loader: DataLoader
+        device: CPU or CUDA
+        tolerance: Tolerance margin (default 0.2 for ±20%)
 
-        total += targets.sum().item()
-        count += targets.size(0)
+    Returns:
+        (mae, tolerance_accuracy): tuple of floats
+    """
+    model.eval()
+    val_mae_sum = 0.0
+    pred_list = []
+    target_list = []
 
-    return total / count if count > 0 else 0
+    with torch.no_grad():
+        for batch in loader:
+            if len(batch) == 3:
+                imgs, targets, _ = batch
+            else:
+                imgs, targets = batch
 
+            imgs, targets = imgs.to(device), targets.to(device)
+            preds = model(imgs).view(-1)
+            targets = targets.view(-1)
+
+            val_mae_sum += torch.abs(preds - targets).sum().item()
+
+            pred_list.append(preds)
+            target_list.append(targets)
+
+    # Calculate MAE
+    mae = val_mae_sum / len(loader.dataset)
+
+    # Calculate Tolerance-based Accuracy
+    preds_all = torch.cat(pred_list)
+    targets_all = torch.cat(target_list)
+
+    lower_bound = targets_all * (1 - tolerance)
+    upper_bound = targets_all * (1 + tolerance)
+    correct = ((preds_all >= lower_bound) & (preds_all <= upper_bound)).sum().item()
+    tol_acc = (correct / targets_all.size(0)) * 100
+
+    return mae, tol_acc
 
 # %%
 from torchinfo import summary
 from ptflops import get_model_complexity_info
-import torch
 
-def summarize_model(model, input_size=(3, 256, 256)):
+def summarize_model(model, input_size=(3, 256, 256), print_summary=True):
     """
-    Prints a clean summary of model structure, parameters, and FLOPS (GFLOPS).
-    Also returns (gflops, params_million).
-    
+    Summarizes the model architecture, parameters, FLOPs.
+
     Args:
         model (nn.Module): PyTorch model
-        input_size (tuple): (C, H, W)
+        input_size (tuple): Input tensor size (C, H, W)
+        print_summary (bool): Whether to print the structure or just return values.
 
     Returns:
-        gflops (float): GFLOPS
-        params_million (float): Total params in million
+        gflops (float): Total FLOPs (GFLOPS)
+        params_million (float): Total number of parameters (Million)
     """
     model = model.cpu()
     model.eval()
 
-    print("\n🧠 Model Structure Summary:")
-    info = summary(model, input_size=(1, *input_size), depth=2, col_names=["input_size", "output_size", "num_params"], verbose=0)
-    print(info)
-    print("\n📏 Calculating Params and FLOPS...")
+    if print_summary:
+        print("\n🧠 Model Structure Summary:")
+        info = summary(
+            model,
+            input_size=(1, *input_size),
+            depth=2,
+            col_names=["input_size", "output_size", "num_params"],
+            verbose=0
+        )
+        print(info)
+
+    # Calculate MACs and Params
     macs, params = get_model_complexity_info(
-        model, 
-        input_res=input_size, 
-        as_strings=False, 
-        print_per_layer_stat=False, 
+        model,
+        input_res=input_size,
+        as_strings=False,
+        print_per_layer_stat=False,
         verbose=False
     )
 
     gflops = macs / 1e9
     params_million = params / 1e6
 
-    print(f"\n📊 Total Parameters: {params_million:.2f} Million")
-    print(f"⚡ Estimated Multiply-Adds (MACs): {gflops:.4f} GFLOPS\n")
+    if print_summary:
+        print("\n📏 Model Size and Complexity:")
+        print(f"⚡ GFLOPS: {gflops:.4f}")
+        print(f"📦 Parameters: {params_million:.2f} Million")
 
     return gflops, params_million
+
+# %%
+import os
+from datetime import datetime
+
+class TrainingLogger:
+    def __init__(self, model_name, base_log_dir="runs/train"):
+        """
+        Initialize a new experiment log folder and training logger.
+
+        Args:
+            model_name (str): Name of the model
+            base_log_dir (str): Base directory to save experiment logs
+        """
+        self.model_name = model_name
+        self.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        # Define experiment folder: base_log_dir/model_name/timestamp/
+        self.experiment_dir = os.path.join(base_log_dir, model_name, self.timestamp)
+        os.makedirs(self.experiment_dir, exist_ok=True)
+
+        # Define paths
+        self.log_filename = f"{model_name}_trainlog.txt"
+        self.log_filepath = os.path.join(self.experiment_dir, self.log_filename)
+
+        # Create the log file header
+        with open(self.log_filepath, "w") as f:
+            f.write(f"Training Log for Model: {self.model_name}\n")
+            f.write(f"Start Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write("="*60 + "\n")
+
+    def log_epoch(self, message):
+        """
+        Append an epoch log.
+
+        Args:
+            message (str): The log message for the epoch
+        """
+        with open(self.log_filepath, "a") as f:
+            f.write(message + "\n")
+
+    def log_best_checkpoint(self, best_epoch, best_val_tol_acc):
+        """
+        Log that a best checkpoint was saved.
+
+        Args:
+            best_epoch (int): Best epoch so far
+            best_val_tol_acc (float): Best validation tolerance accuracy so far
+        """
+        with open(self.log_filepath, "a") as f:
+            f.write(f"✅ Best checkpoint updated at Epoch {best_epoch} | Val TolAcc: {best_val_tol_acc:.2f}%\n")
+
+    def finalize(self, best_epoch, best_val_tol_acc, best_val_mae, model_score):
+        """
+        Finalize the training log with final model summary.
+        """
+        with open(self.log_filepath, "a") as f:
+            f.write("\n" + "="*60 + "\n")
+            f.write("🏁 Final Training Summary\n")
+            f.write(f"⭐ Best Epoch: {best_epoch}\n")
+            f.write(f"✅ Best Validation Tolerance Accuracy: {best_val_tol_acc:.2f}%\n")
+            f.write(f"📏 Corresponding Validation MAE: {best_val_mae:.2f}\n")
+            f.write(f"🏆 Final Model Score: {model_score:.4f}\n")
+            f.write(f"🕒 End Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write("="*60 + "\n")
+
+    def get_experiment_dir(self):
+        """
+        Returns the path to this experiment directory.
+
+        Returns:
+            str: Experiment directory path
+        """
+        return self.experiment_dir
+
+    def get_log_path(self):
+        """
+        Return the path of the log file.
+
+        Returns:
+            str: Path to log file
+        """
+        return self.log_filepath
+
 
 # %%
 class TrainConfig:
@@ -355,7 +455,6 @@ class TrainConfig:
                  num_epochs=150,
                  lr=0.001,
                  patience=30,
-                 ckpt_dir="checkpoints",
                  log_dir="runs/train",
                  use_cutmix=True,
                  cutmix_alpha=1.0,
@@ -368,7 +467,6 @@ class TrainConfig:
         self.num_epochs = num_epochs
         self.lr = lr
         self.patience = patience
-        self.ckpt_dir = ckpt_dir
         self.log_dir = log_dir
 
         # CutMix
@@ -382,6 +480,51 @@ class TrainConfig:
         # Dataset
         self.dataset_root = dataset_root
         self.use_augment = use_augment
+
+# %%
+def finalize_model_evaluation(config: TrainConfig, train_loader, test_loader, device, best_epoch, logger, tolerance=0.2):
+    """
+    Reload the best checkpoint, summarize model, evaluate on test set, calculate final model score,
+    and finalize the training log.
+
+    Args:
+        config (TrainConfig): Configuration object
+        train_loader (DataLoader): Training set loader
+        test_loader (DataLoader): Test set loader
+        device (torch.device): CUDA or CPU
+        best_epoch (int): Best epoch where checkpoint saved
+        logger (TrainingLogger): Logger to record the final summary
+        tolerance (float): Tolerance margin for accuracy (default: ±20%)
+    """
+    # 🚀 Reload best checkpoint
+    model = get_model(config.model_name).to(device)
+    checkpoint_path = os.path.join(config.log_dir, f"{config.model_name}_best.pth")
+    checkpoint = torch.load(checkpoint_path, map_location=device)
+    model.load_state_dict(checkpoint["model_state_dict"])
+
+    # 📏 Summarize model: show GFLOPS, Params
+    gflops, params_million = summarize_model(model, print_summary=True)
+
+    # 📈 Evaluate on test set
+    best_val_mae, best_val_tol_acc = evaluate_model_mae_tolerance(model, test_loader, device, tolerance)
+
+    # 🧮 Calculate final model score
+    total_train_images = len(train_loader.dataset)
+    model_score = (1 - (best_val_tol_acc / 100)) * gflops * params_million * total_train_images
+
+    # 🖨️ Print final summary
+    print("\n🚀 Final Model Analysis:")
+    print(f"⭐ Best Epoch: {best_epoch}")
+    print(f"⚡ GFLOPS: {gflops:.4f}")
+    print(f"📦 Params: {params_million:.2f} Million")
+    print(f"✅ Best Val Tolerance Accuracy: {best_val_tol_acc:.2f}%")
+    print(f"📏 Corresponding Val MAE: {best_val_mae:.2f}")
+    print(f"🏆 Final Model Score: {model_score:.4f}")
+
+    # 📓 Log final summary
+    logger.finalize(best_epoch, best_val_tol_acc, best_val_mae, model_score)
+
+    return model_score
 
 # %% [markdown]
 # # Main Training Function
@@ -408,9 +551,12 @@ def train_model(config: TrainConfig):
     Args:
         config (TrainConfig): Configuration object containing all hyperparameters and paths.
     """
-    # 🛠️ Setup device, directories, and TensorBoard
+    # 🛠️ Setup device, directories, TensorBoard, Logger
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    os.makedirs(config.ckpt_dir, exist_ok=True)
+
+    # 📓 Initialize Training Logger (each experiment gets a new folder)
+    logger = TrainingLogger(config.model_name)
+    config.log_dir = logger.get_experiment_dir()  # Update log_dir dynamically for this run
     writer = SummaryWriter(log_dir=config.log_dir)
 
     # 📦 Load dataset
@@ -439,18 +585,13 @@ def train_model(config: TrainConfig):
     )
 
     # 📈 Tracking variables
-    best_val_mae = float('inf')
+    best_val_tol_acc = 0.0
     best_epoch = 0
     epochs_no_improve = 0
-
-    avg_gt_train = calculate_avg_ground_truth(train_loader)
-    avg_gt_val = calculate_avg_ground_truth(test_loader)
-    print(f"Avg GT (Train): {avg_gt_train:.2f}  |  Avg GT (Val): {avg_gt_val:.2f}")
 
     # 🚀 Main training loop
     for epoch in range(1, config.num_epochs + 1):
         model.train()
-        train_mae_sum = 0.0
 
         for imgs, targets in train_loader:
             imgs, targets = imgs.to(device), targets.to(device)
@@ -472,48 +613,39 @@ def train_model(config: TrainConfig):
             optimizer.step()
             scheduler.step()
 
-            train_mae_sum += torch.abs(preds - targets.view(-1)).sum().item()
-
-        train_mae = train_mae_sum / len(train_loader.dataset)
-
-        # 🔍 Validation phase
-        model.eval()
-        val_mae_sum = 0.0
-        with torch.no_grad():
-            for imgs, targets, _ in test_loader:
-                imgs, targets = imgs.to(device), targets.to(device)
-                preds = model(imgs).view(-1)
-                val_mae_sum += torch.abs(preds - targets.view(-1)).sum().item()
-
-        val_mae = val_mae_sum / len(test_loader.dataset)
-        train_acc = calculate_accuracy(train_mae, avg_gt_train)
-        val_acc = calculate_accuracy(val_mae, avg_gt_val)
+        # 📈 Evaluation after epoch
+        train_mae, train_tol_acc = evaluate_model_mae_tolerance(model, train_loader, device, tolerance=0.2)
+        val_mae, val_tol_acc = evaluate_model_mae_tolerance(model, test_loader, device, tolerance=0.2)
 
         # 🖊️ Logging to TensorBoard
-        writer.add_scalar(f"{config.model_name}/Train_MAE", train_mae, epoch)
-        writer.add_scalar(f"{config.model_name}/Val_MAE", val_mae, epoch)
-        writer.add_scalar(f"{config.model_name}/Train_Acc", train_acc, epoch)
-        writer.add_scalar(f"{config.model_name}/Val_Acc", val_acc, epoch)
+        writer.add_scalar(f"{config.model_name}/MAE/Train", train_mae, epoch)
+        writer.add_scalar(f"{config.model_name}/MAE/Val", val_mae, epoch)
+        writer.add_scalar(f"{config.model_name}/TolAcc/Train", train_tol_acc, epoch)
+        writer.add_scalar(f"{config.model_name}/TolAcc/Val", val_tol_acc, epoch)
 
-        # 💾 Save checkpoint if better
+        # 📓 Prepare log message
         log_msg = (
             f"[{config.model_name}] Epoch {epoch}/{config.num_epochs} | "
-            f"Train MAE: {train_mae:.2f} ({train_acc:.2f}% Acc) | "
-            f"Val MAE: {val_mae:.2f} ({val_acc:.2f}% Acc) | "
+            f"Train MAE: {train_mae:.2f} ({train_tol_acc:.2f}% TolAcc) | "
+            f"Val MAE: {val_mae:.2f} ({val_tol_acc:.2f}% TolAcc) | "
             f"LR: {optimizer.param_groups[0]['lr']:.1e}"
         )
 
-        if val_mae < best_val_mae:
-            best_val_mae = val_mae
+        # 💾 Save checkpoint if better
+        if val_tol_acc > best_val_tol_acc:
+            best_val_tol_acc = val_tol_acc
             best_epoch = epoch
             epochs_no_improve = 0
-            path = os.path.join(config.ckpt_dir, f"{config.model_name}_best.pth")
+            path = os.path.join(config.log_dir, f"{config.model_name}_best.pth")
             save_checkpoint(model, optimizer, epoch, path)
+            writer.add_scalar(f"{config.model_name}/TolAcc/BestVal", best_val_tol_acc, epoch)
+            logger.log_best_checkpoint(best_epoch, best_val_tol_acc)
             log_msg += " ✅ Saved"
         else:
             epochs_no_improve += 1
 
         print(log_msg)
+        logger.log_epoch(log_msg)
 
         # 🛑 Early stopping
         if epochs_no_improve >= config.patience:
@@ -522,11 +654,11 @@ def train_model(config: TrainConfig):
 
     # 🏁 End of training
     writer.close()
-    print(
-        f"Training done. Best epoch: {best_epoch} | "
-        f"Val MAE: {best_val_mae:.2f} "
-        f"({calculate_accuracy(best_val_mae, avg_gt_val):.2f}% Acc)"
-    )
+
+    # 🔥 Final evaluation and model score calculation
+    model_score = finalize_model_evaluation(config, train_loader, test_loader, device, best_epoch=best_epoch, logger=logger, tolerance=0.2)
+
+    return model_score
 
 # %% [markdown]
 # # Training and Evaluation
@@ -535,23 +667,11 @@ def train_model(config: TrainConfig):
 # ## ShuffleNet
 
 # %%
-# Normal training
-# MAE: 116.27 (73.20% Acc) - lr: 0.001, patience: 40, cutmix: 1, epochs: 250
-# MAE: 117.64 (72.89% Acc) - lr: 0.001, patience: 50, cutmix: 0.8, epochs: 250
-# MAE: 115.47 (73.39% Acc) - lr:0.001, patience: 50, cutmix: 1.5, epochs: 250
-# MAE: 121.29 (72.05% Acc) - lr:0.001, patience: 50, cutmix: 2, epochs: 250
-# MAE: 119.21 (72.53% Acc) at epochs 128 - lr:0.001, patience: 50, cutmix: 1.5, epochs: 300
-# MAE: 117.81 (72.85% Acc) at epochs 82 - lr:0.001, patience: 50, cutmix: False, epochs: 300
-# MAE: 122.59 (71.75% Acc) - lr:0.001, patience: 50, cutmix: 1.5, epochs: 250
-# MAE: 116.66 (73.11% Acc) at epochs 106 - lr:0.001, patience: 50, cutmix: 1, epochs: 250
-# MAE: 118.23 (72.73% Acc) at epochs 100 - lr:0.001, patience: 50, cutmix: False, augment: False epochs: 250
-# MAE: 112.11 (74.16% Acc) at epochs 136 - lr:0.001, patience: 50, cutmix: 1, epochs: 250, augment: True
 train_config_shufflenet = TrainConfig(
     model_name="shufflenet_v2_x0_5",
     num_epochs=250,
     lr=0.001,
     patience=50,
-    ckpt_dir="checkpoints/shufflenet_v2_x0_5",
     log_dir="runs/train/shufflenet_v2_x0_5",
     use_cutmix=True,
     cutmix_alpha=1,
@@ -565,33 +685,13 @@ train_config_shufflenet = TrainConfig(
 # Normal training
 train_model(train_config_shufflenet)
 
-# %%
-# Model summary including FLOPs and parameters
-# Uncomment to visualize the model structure, GFLOPS, and parameters
-# ShuffleNetV2 - GFLOPS: 0.0571, Params: 0.34M
-# model = get_model(train_config_shufflenet.model_name)
-# gflops, params = summarize_model(model)
-# print(f"GFLOPS: {gflops:.4f}, Params: {params:.2f}M")
-
 # %% [markdown]
 # ## Evaluation
 
 # %%
-def test_model(model, test_loader, device):
-    model.eval()
-    total_mae = 0.0
-    with torch.no_grad():
-        for imgs, targets,_ in test_loader:
-            imgs, targets = imgs.to(device), targets.to(device)
-            preds = model(imgs).view(-1)
-            targets = targets.view(-1)
-            total_mae += torch.abs(preds - targets).sum().item()
-    return total_mae / len(test_loader.dataset)
-
-# %%
 def load_best_model(config: TrainConfig, device):
     model = get_model(config.model_name).to(device)
-    ckpt_path = os.path.join(config.ckpt_dir, f"{config.model_name}_best.pth")
+    ckpt_path = os.path.join(config.log_dir, f"{config.model_name}_best.pth")
     checkpoint = torch.load(ckpt_path, map_location=device)
     model.load_state_dict(checkpoint["model_state_dict"])
     model.eval()
@@ -650,42 +750,6 @@ def predict_on_test_set(model, test_loader, device, max_images=4):
     return predictions, ground_truth
 
 # %%
-def calculate_exact_match_accuracy(model, test_loader, device):
-    """
-    Calculates the exact match accuracy on the test set.
-    A prediction is considered correct if it exactly matches the ground truth after rounding.
-
-    Args:
-        model: Trained PyTorch model
-        test_loader: DataLoader for test set
-        device: CPU or CUDA
-    Returns:
-        exact_match_acc (float): Exact match accuracy in percentage
-    """
-    model.eval()
-    correct = 0
-    total = 0
-
-    with torch.no_grad():
-        for batch in test_loader:
-            if len(batch) == 3:
-                imgs, targets, _ = batch
-            else:
-                imgs, targets = batch
-
-            imgs, targets = imgs.to(device), targets.to(device)
-            preds = model(imgs).view(-1)
-
-            preds_rounded = preds.round()
-            targets_rounded = targets.view(-1).round()
-
-            correct += (preds_rounded == targets_rounded).sum().item()
-            total += targets.size(0)
-
-    exact_match_acc = (correct / total) * 100 if total > 0 else 0
-    return exact_match_acc
-
-# %%
 def plot_prediction_vs_ground_truth(model, test_loader, device):
     """
     Predicts on the test set and plots predicted counts vs ground truth counts.
@@ -741,16 +805,6 @@ train_loader, test_loader = load_shanghai_dataset(
 )
 # Load best model
 model = load_best_model(train_config_shufflenet, device)
-
-# %%
-# Evaluate MAE
-mae = test_model(model, test_loader, device)
-print(f"Test MAE: {mae:.2f}")
-
-# %%
-# Calculate exact match accuracy
-exact_match_acc = calculate_exact_match_accuracy(model, test_loader, device)
-print(f"Exact Match Accuracy: {exact_match_acc:.2f}%")
 
 # %%
 # Get predictions
