@@ -69,9 +69,6 @@ def custom_collate_fn(batch):
     return torch.stack(imgs), torch.stack(targets), raws
 
 # %%
-import torchvision.transforms as transforms
-import torch
-
 def get_train_transform(level="moderate", input_size=256):
     """
     Return the train transform based on augmentation strength level.
@@ -184,7 +181,6 @@ def load_shanghai_dataset(dataset_root, batch_size=16, use_augment=True, augment
     test_loader = DataLoader(testset, batch_size=1, shuffle=False, collate_fn=custom_collate_fn, num_workers=4, pin_memory=True, persistent_workers=True)
 
     return train_loader, test_loader
-
 
 # %% [markdown]
 # # Model Definitions
@@ -713,7 +709,6 @@ def train_model(config: TrainConfig):
 
     return model_score
 
-
 # %% [markdown]
 # # Training and Evaluation
 
@@ -723,7 +718,7 @@ def train_model(config: TrainConfig):
 # %%
 train_config_shufflenet = TrainConfig(
     model_name="shufflenet_v2_x0_5",
-    num_epochs=250,
+    num_epochs=300,
     lr=0.001,
     patience=60,
     batch_size=16,
