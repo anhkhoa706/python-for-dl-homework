@@ -6,6 +6,7 @@ import os
 import numpy as np
 from glob import glob
 from PIL import Image
+from datetime import datetime
 import matplotlib.pyplot as plt
 from scipy.io import loadmat
 
@@ -68,7 +69,76 @@ def custom_collate_fn(batch):
     return torch.stack(imgs), torch.stack(targets), raws
 
 # %%
-def load_shanghai_dataset(dataset_root, batch_size=16, use_augment=True):
+import torchvision.transforms as transforms
+import torch
+
+def get_train_transform(level="moderate", input_size=256):
+    """
+    Return the train transform based on augmentation strength level.
+
+    Args:
+        level (str): "light", "moderate", or "strong"
+        input_size (int): Size to resize images (default 256)
+    Returns:
+        torchvision.transforms.Compose
+    """
+
+    if level == "light":
+        # Light augmentation: safest
+        transform = transforms.Compose([
+            transforms.Resize((input_size, input_size)),
+            transforms.RandomApply([
+                transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.05)
+            ], p=0.8),
+            transforms.RandomGrayscale(p=0.1),
+            transforms.RandomHorizontalFlip(p=0.5),
+            transforms.GaussianBlur(kernel_size=(3, 3), sigma=(0.1, 1.5)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                 std=[0.229, 0.224, 0.225])
+        ])
+        
+    elif level == "moderate":
+        # Moderate augmentation: slightly stronger
+        transform = transforms.Compose([
+            transforms.Resize((input_size, input_size)),
+            transforms.RandomApply([
+                transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.05)
+            ], p=0.8),
+            transforms.RandomGrayscale(p=0.1),
+            transforms.RandomHorizontalFlip(p=0.5),
+            transforms.RandomRotation(degrees=15),
+            transforms.GaussianBlur(kernel_size=(3, 3), sigma=(0.1, 2.0)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                 std=[0.229, 0.224, 0.225])
+        ])
+
+    elif level == "strong":
+        # Very strong augmentation: aggressive, risky
+        transform = transforms.Compose([
+            transforms.Resize((input_size, input_size)),
+            transforms.RandomApply([
+                transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0.1)
+            ], p=0.9),
+            transforms.RandomGrayscale(p=0.2),
+            transforms.RandomHorizontalFlip(p=0.5),
+            transforms.RandomRotation(degrees=20),
+            transforms.RandomPerspective(distortion_scale=0.5, p=0.7),
+            transforms.RandomAffine(degrees=10, translate=(0.1, 0.1)),
+            transforms.GaussianBlur(kernel_size=(5, 5), sigma=(0.1, 2.0)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                 std=[0.229, 0.224, 0.225])
+        ])
+        
+    else:
+        raise ValueError(f"Unknown augmentation level: {level}")
+
+    return transform
+
+# %%
+def load_shanghai_dataset(dataset_root, batch_size=16, use_augment=True, augment_level="light"):
     """
     Load ShanghaiTech Part A dataset.
 
@@ -89,19 +159,7 @@ def load_shanghai_dataset(dataset_root, batch_size=16, use_augment=True):
 
     # Define transforms
     if use_augment:
-        train_transform = transforms.Compose([
-            transforms.Resize((256, 256)),
-            transforms.RandomApply([
-                transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.05)
-            ], p=0.8),
-            transforms.RandomGrayscale(p=0.1),
-            transforms.RandomHorizontalFlip(p=0.5),
-            transforms.RandomRotation(degrees=15),
-            transforms.GaussianBlur(kernel_size=(3, 3), sigma=(0.1, 2.0)),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                 std=[0.229, 0.224, 0.225])
-        ])
+        train_transform = get_train_transform(level=augment_level)
     else:
         train_transform = transforms.Compose([
             transforms.Resize((256, 256)),
@@ -159,13 +217,10 @@ def get_model(name):
     model = constructor(weights=weights)
 
     if head == 'classifier':
-        if name == 'efficientnet_b0':
-            model.classifier[-1] = nn.Sequential(
-                nn.Dropout(0.3),
-                nn.Linear(model.classifier[-1].in_features, 1)
-            )
-        else:
-            model.classifier[-1] = nn.Linear(model.classifier[-1].in_features, 1)
+        model.classifier[-1] = nn.Sequential(
+            nn.Dropout(0.3),
+            nn.Linear(model.classifier[-1].in_features, 1)
+        )
     elif head == 'fc':
         model.fc = nn.Sequential(
         nn.Dropout(0.3),
@@ -365,26 +420,13 @@ def summarize_model(model, input_size=(3, 256, 256), print_summary=True):
     return gflops, params_million
 
 # %%
-import os
-from datetime import datetime
-
 class TrainingLogger:
     def __init__(self, model_name, base_log_dir="runs/train"):
-        """
-        Initialize a new experiment log folder and training logger.
-
-        Args:
-            model_name (str): Name of the model
-            base_log_dir (str): Base directory to save experiment logs
-        """
         self.model_name = model_name
         self.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        
-        # Define experiment folder: base_log_dir/model_name/timestamp/
         self.experiment_dir = os.path.join(base_log_dir, model_name, self.timestamp)
         os.makedirs(self.experiment_dir, exist_ok=True)
 
-        # Define paths
         self.log_filename = f"{model_name}_trainlog.txt"
         self.log_filepath = os.path.join(self.experiment_dir, self.log_filename)
 
@@ -394,34 +436,41 @@ class TrainingLogger:
             f.write(f"Start Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
             f.write("="*60 + "\n")
 
-    def log_epoch(self, message):
-        """
-        Append an epoch log.
+    def log_train_config(self, config):
+        """Log the training configuration settings."""
+        with open(self.log_filepath, "a") as f:
+            f.write("📋 Train Config:\n")
+            f.write(f"Model Name: {config.model_name}\n")
+            f.write(f"Num Epochs: {config.num_epochs}\n")
+            f.write(f"Learning Rate: {config.lr}\n")
+            f.write(f"Patience: {config.patience}\n")
+            f.write(f"Use CutMix: {config.use_cutmix} (Alpha={config.cutmix_alpha})\n")
+            f.write(f"Use Augment: {config.use_augment}\n")
+            f.write(f"Use Grad Clip: {config.use_grad_clip} (Max Norm={config.grad_clip_max_norm})\n")
+            f.write(f"Resize: (256, 256)\n")  
+            f.write(f"Loss Function: L1Loss\n")
+            f.write("="*60 + "\n")
 
-        Args:
-            message (str): The log message for the epoch
-        """
+    def log_model_summary(self, gflops, params_million):
+        """Log model architecture summary."""
+        with open(self.log_filepath, "a") as f:
+            f.write("\n🧠 Model Summary:\n")
+            f.write(f"GFLOPS: {gflops:.4f}\n")
+            f.write(f"Params: {params_million:.2f} Million\n")
+            f.write("="*60 + "\n")
+
+    def log_epoch(self, message):
         with open(self.log_filepath, "a") as f:
             f.write(message + "\n")
 
     def log_best_checkpoint(self, best_epoch, best_val_tol_acc):
-        """
-        Log that a best checkpoint was saved.
-
-        Args:
-            best_epoch (int): Best epoch so far
-            best_val_tol_acc (float): Best validation tolerance accuracy so far
-        """
         with open(self.log_filepath, "a") as f:
             f.write(f"✅ Best checkpoint updated at Epoch {best_epoch} | Val TolAcc: {best_val_tol_acc:.2f}%\n")
 
     def finalize(self, best_epoch, best_val_tol_acc, best_val_mae, model_score):
-        """
-        Finalize the training log with final model summary.
-        """
         with open(self.log_filepath, "a") as f:
             f.write("\n" + "="*60 + "\n")
-            f.write("🏁 Final Training Summary\n")
+            f.write("🏁 Final Training Summary:\n")
             f.write(f"⭐ Best Epoch: {best_epoch}\n")
             f.write(f"✅ Best Validation Tolerance Accuracy: {best_val_tol_acc:.2f}%\n")
             f.write(f"📏 Corresponding Validation MAE: {best_val_mae:.2f}\n")
@@ -430,61 +479,58 @@ class TrainingLogger:
             f.write("="*60 + "\n")
 
     def get_experiment_dir(self):
-        """
-        Returns the path to this experiment directory.
-
-        Returns:
-            str: Experiment directory path
-        """
         return self.experiment_dir
 
     def get_log_path(self):
-        """
-        Return the path of the log file.
-
-        Returns:
-            str: Path to log file
-        """
         return self.log_filepath
-
 
 # %%
 class TrainConfig:
-    def __init__(self,
-                 model_name="efficientnet_b0",
-                 num_epochs=150,
-                 lr=0.001,
-                 patience=30,
-                 log_dir="runs/train",
-                 use_cutmix=True,
-                 cutmix_alpha=1.0,
-                 use_grad_clip=True,
-                 grad_clip_max_norm=1.0,
-                 dataset_root="your/dataset/path",
-                 use_augment=True):
-        
+    """
+    Configuration object for training.
+    Contains all hyperparameters and settings.
+    """
+    def __init__(
+        self,
+        model_name="shufflenet_v2_x0_5",
+        dataset_root="path/to/dataset",
+        num_epochs=250,
+        lr=0.001,
+        patience=50,
+        batch_size=16,
+        use_cutmix=True,
+        cutmix_alpha=1.5,
+        use_grad_clip=True,
+        grad_clip_max_norm=1.0,
+        use_augment=True,
+        loss_type="l1",  
+        input_size=256,  # input image size (256x256 default)
+        base_log_dir="runs/train"  # log saving
+    ):
         self.model_name = model_name
+        self.dataset_root = dataset_root
         self.num_epochs = num_epochs
         self.lr = lr
         self.patience = patience
-        self.log_dir = log_dir
-
-        # CutMix
+        self.batch_size = batch_size
         self.use_cutmix = use_cutmix
         self.cutmix_alpha = cutmix_alpha
-        
-        # Gradient Clipping
         self.use_grad_clip = use_grad_clip
         self.grad_clip_max_norm = grad_clip_max_norm
-
-        # Dataset
-        self.dataset_root = dataset_root
         self.use_augment = use_augment
+        self.loss_type = loss_type
+        self.input_size = input_size
+        self.base_log_dir = base_log_dir
+
+        # Filled after summarizing the model
+        self.log_dir = None
+        self.model_gflops = None
+        self.model_params_million = None
 
 # %%
 def finalize_model_evaluation(config: TrainConfig, train_loader, test_loader, device, best_epoch, logger, tolerance=0.2):
     """
-    Reload the best checkpoint, summarize model, evaluate on test set, calculate final model score,
+    Reload the best checkpoint, evaluate on test set, calculate final model score,
     and finalize the training log.
 
     Args:
@@ -502,21 +548,18 @@ def finalize_model_evaluation(config: TrainConfig, train_loader, test_loader, de
     checkpoint = torch.load(checkpoint_path, map_location=device)
     model.load_state_dict(checkpoint["model_state_dict"])
 
-    # 📏 Summarize model: show GFLOPS, Params
-    gflops, params_million = summarize_model(model, print_summary=True)
-
     # 📈 Evaluate on test set
     best_val_mae, best_val_tol_acc = evaluate_model_mae_tolerance(model, test_loader, device, tolerance)
 
     # 🧮 Calculate final model score
     total_train_images = len(train_loader.dataset)
-    model_score = (1 - (best_val_tol_acc / 100)) * gflops * params_million * total_train_images
+    model_score = (1 - (best_val_tol_acc / 100)) * config.model_gflops * config.model_params_million * total_train_images
 
     # 🖨️ Print final summary
     print("\n🚀 Final Model Analysis:")
     print(f"⭐ Best Epoch: {best_epoch}")
-    print(f"⚡ GFLOPS: {gflops:.4f}")
-    print(f"📦 Params: {params_million:.2f} Million")
+    print(f"⚡ GFLOPS: {config.model_gflops:.4f}")
+    print(f"📦 Params: {config.model_params_million:.2f} Million")
     print(f"✅ Best Val Tolerance Accuracy: {best_val_tol_acc:.2f}%")
     print(f"📏 Corresponding Val MAE: {best_val_mae:.2f}")
     print(f"🏆 Final Model Score: {model_score:.4f}")
@@ -556,14 +599,18 @@ def train_model(config: TrainConfig):
 
     # 📓 Initialize Training Logger (each experiment gets a new folder)
     logger = TrainingLogger(config.model_name)
-    config.log_dir = logger.get_experiment_dir()  # Update log_dir dynamically for this run
+    config.log_dir = logger.get_experiment_dir()
     writer = SummaryWriter(log_dir=config.log_dir)
+
+    # 📋 Log the training configuration immediately
+    logger.log_train_config(config)
 
     # 📦 Load dataset
     train_loader, test_loader = load_shanghai_dataset(
         config.dataset_root,
-        batch_size=16,
-        use_augment=config.use_augment
+        batch_size=config.batch_size,
+        use_augment=config.use_augment,
+        augment_level="moderate"
     )
     print(f"Train Images: {len(train_loader.dataset)}  |  Test Images: {len(test_loader.dataset)}")
 
@@ -572,8 +619,14 @@ def train_model(config: TrainConfig):
     dummy_input = torch.randn(1, 3, 256, 256, device=device)
     writer.add_graph(model, dummy_input)
 
+    # 🧠 Model Summary (GFLOPS + Params)
+    gflops, params_million = summarize_model(model, print_summary=True)
+    logger.log_model_summary(gflops, params_million)
+    config.model_gflops = gflops
+    config.model_params_million = params_million
+
     # ⚡ Loss, optimizer, scheduler
-    criterion = nn.SmoothL1Loss(beta=1.0)
+    criterion = nn.L1Loss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=config.lr, weight_decay=1e-4)
     total_steps = config.num_epochs * len(train_loader)
     scheduler = OneCycleLR(
@@ -660,6 +713,7 @@ def train_model(config: TrainConfig):
 
     return model_score
 
+
 # %% [markdown]
 # # Training and Evaluation
 
@@ -671,8 +725,8 @@ train_config_shufflenet = TrainConfig(
     model_name="shufflenet_v2_x0_5",
     num_epochs=250,
     lr=0.001,
-    patience=50,
-    log_dir="runs/train/shufflenet_v2_x0_5",
+    patience=60,
+    batch_size=16,
     use_cutmix=True,
     cutmix_alpha=1,
     use_grad_clip=True,
@@ -682,8 +736,26 @@ train_config_shufflenet = TrainConfig(
 )
 
 # %%
-# Normal training
 train_model(train_config_shufflenet)
+
+# %% [markdown]
+# ## MobileNet_v3_small
+
+# %%
+# train_config_mobilenet_v3 = TrainConfig(
+#     model_name="mobilenet_v3_small",
+#     num_epochs=250,
+#     lr=0.0005,
+#     patience=50,
+#     log_dir="runs/train/mobilenet_v3_small",
+#     use_cutmix=True,
+#     cutmix_alpha=1,
+#     use_grad_clip=True,
+#     grad_clip_max_norm=1.0,
+#     dataset_root="/home/wins057/Documents/Projects/python-for-dl-homework/week10/dataset/ShanghaiTech_Crowd_Counting_Dataset",
+#     use_augment=True
+# )
+# train_model(train_config_mobilenet_v3)
 
 # %% [markdown]
 # ## Evaluation
