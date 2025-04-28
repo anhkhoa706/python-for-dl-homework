@@ -11,5 +11,11 @@
 ===========================================================================================================
 After put the Accuracy with Tolerance +-20%
 - Best Epoch: 115 - Best Validation Tolerance Accuracy: 49.45% Corresponding Validation MAE: 127.01
-Remove the Smooth, now criterion = nn.L1Loss()
-- Best Epoch: 143 - Best Validation Tolerance Accuracy: 52.10% Corresponding Validation MAE: 119.95
+Remove the Smooth, now criterion = nn.L1Loss() ()
+- Best Epoch: 143 - Best Validation Tolerance Accuracy: 51.10% Corresponding Validation MAE: 119.95
+After put the resize to 320 (run two times wiht the same result)
+- Best Epoch: 92 - Best Validation Tolerance Accuracy: 49.45% Corresponding Validation MAE: 127.47
+Resize 256 (normal) with the alpha CutMix is 1.5
+- Best Epoch: 164 - Best Val Tolerance Accuracy: 50.55% Corresponding Val MAE: 120.26
+LR lower to 0.0005 patience increase to 60
+- Best Epoch: 122 - Best Val Tolerance Accuracy: 47.25% Corresponding Val MAE: 137.89
